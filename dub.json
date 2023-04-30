@@ -1,0 +1,16 @@
+{
+	"name": "anisette-v3-server",
+	"description": "Anisette server implementing SideStore's anisette v3 protocol",
+	"authors": [
+		"Dadoum"
+	],
+
+	"dependencies": {
+		"hunt-http": "~>0.8.2",
+		"provision": {
+			"repository": "git+https://github.com/Dadoum/Provision.git",
+			"version": "e3560d82997768a39550a773a75345a015b96548"
+		},
+		"slf4d": "~>2.1.1"
+	}
+}

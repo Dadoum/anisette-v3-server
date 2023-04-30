@@ -1,0 +1,14 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"dxml": "0.4.3",
+		"hunt": "1.7.17",
+		"hunt-extra": "1.2.3",
+		"hunt-http": "0.8.2",
+		"hunt-net": "0.7.1",
+		"hunt-openssl": "1.0.5",
+		"plist": "~master",
+		"provision": {"version":"e3560d82997768a39550a773a75345a015b96548","repository":"git+https://github.com/Dadoum/Provision.git"},
+		"slf4d": "2.1.1"
+	}
+}
