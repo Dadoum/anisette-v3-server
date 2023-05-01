@@ -224,7 +224,7 @@ class SocketProvisioningSessionHandler: AbstractWebSocketMessageHandler {
 	SocketProvisioningSession[WebSocketConnection] sessions;
 
 	override void onOpen(WebSocketConnection connection) {
-		getLogger().info("[<<] anisette-v3 /v3/provisioning_session open");
+		log.info("[<<] anisette-v3 /v3/provisioning_session open");
 		sessions[connection] = SocketProvisioningSession(SocketProvisioningSessionState.waitingForIdentifier, null, 0);
 		JSONValue giveIdentifier = [
 			"result": "GiveIdentifier"
@@ -233,7 +233,7 @@ class SocketProvisioningSessionHandler: AbstractWebSocketMessageHandler {
 	}
 
 	override void onClosed(WebSocketConnection connection) {
-		scope(exit) getLogger().info("[<<] anisette-v3 /v3/provisioning_session close");
+		scope(exit) log.info("[<<] anisette-v3 /v3/provisioning_session close");
 		auto session = connection in sessions;
 		if (session) {
 			if (session.adiHandle) {
