@@ -6,10 +6,10 @@
 	],
 
 	"dependencies": {
-		"hunt-http": "~>0.8.2",
+		"lighttp": "~>0.5.4",
 		"provision": {
 			"repository": "git+https://github.com/Dadoum/Provision.git",
-			"version": "e3560d82997768a39550a773a75345a015b96548"
+			"version": "e302d138ce949e361b2ed939be82efe8bb15aab1"
 		},
 		"slf4d": "~>2.1.1"
 	}

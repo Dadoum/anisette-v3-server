@@ -7,8 +7,14 @@
 		"hunt-http": "0.8.2",
 		"hunt-net": "0.7.1",
 		"hunt-openssl": "1.0.5",
+		"libasync": "0.9.2",
+		"lighttp": "0.5.4",
+		"memutils": "1.0.9",
 		"plist": "~master",
-		"provision": {"version":"e3560d82997768a39550a773a75345a015b96548","repository":"git+https://github.com/Dadoum/Provision.git"},
-		"slf4d": "2.1.1"
+		"plist-d": {"version":"d494cf3fe79a2bb20583173c0c8cf85ef33b719e","repository":"git+https://github.com/Dadoum/libplist-d.git"},
+		"provision": {"version":"e302d138ce949e361b2ed939be82efe8bb15aab1","repository":"git+https://github.com/Dadoum/Provision.git"},
+		"slf4d": "2.1.1",
+		"urld": "2.1.1",
+		"xbuffer": "1.0.0"
 	}
 }
