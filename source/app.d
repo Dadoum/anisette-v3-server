@@ -1,3 +1,5 @@
+import core.memory;
+
 import std.algorithm.searching;
 import std.array;
 import std.base64;
@@ -21,6 +23,7 @@ import slf4d: Logger;
 import slf4d.default_provider;
 
 import provision;
+import provision.androidlibrary;
 
 __gshared string libraryPath;
 
@@ -101,7 +104,7 @@ int main(string[] args) {
 
 	// Initializing ADI and machine if it has not already been made.
 	v1Device = new Device(configurationPath.buildPath("device.json"));
-	v1Adi = new ADI(libraryPath);
+	v1Adi = makeGarbageCollectedADI(libraryPath);
 	v1Adi.provisioningPath = configurationPath;
 
 	if (!v1Device.initialized) {
@@ -214,7 +217,7 @@ class AnisetteService {
 
 			file.mkdir(provisioningPath);
 			file.write(provisioningPath.buildPath("adi.pb"), adi_pb);
-			ADI adi = new ADI(libraryPath);
+			ADI adi = makeGarbageCollectedADI(libraryPath);
 			adi.provisioningPath = provisioningPath;
 			adi.identifier = identifier.toUpper()[0..16];
 
@@ -250,6 +253,7 @@ class AnisetteService {
 					.buildPath(identifier)
 				);
 			}
+			GC.collect();
 		}
 	}
 
@@ -296,7 +300,7 @@ class AnisetteService {
 			string identifier = UUID(requestedIdentifier[0..16]).toString();
 			log.infoF!("[<<] Correct identifier (%s).")(identifier);
 
-			ADI adi = new ADI(libraryPath);
+			ADI adi = makeGarbageCollectedADI(libraryPath);
 			auto provisioningPath = file.getcwd()
 				.buildPath("provisioning")
 				.buildPath(identifier);
@@ -379,4 +383,21 @@ class AnisetteService {
 			socket.close();
 		}
 	}
+}
+
+private ADI makeGarbageCollectedADI(string libraryPath) {
+	extern(C) void* malloc_GC(size_t sz) {
+		return GC.malloc(sz);
+	}
+
+	extern(C) void free_GC(void* ptr) {
+		GC.free(ptr);
+	}
+
+	AndroidLibrary storeServicesCore = new AndroidLibrary(libraryPath.buildPath("libstoreservicescore.so"), [
+		"malloc": cast(void*) &malloc_GC,
+		"free": cast(void*) &free_GC
+	]);
+
+	return new ADI(libraryPath, storeServicesCore);
 }
