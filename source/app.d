@@ -14,9 +14,10 @@ import std.uni;
 import std.uuid;
 import std.zip;
 
-import lighttp;
+import vibe.d;
 
 import slf4d;
+import slf4d: Logger;
 import slf4d.default_provider;
 
 import provision;
@@ -30,14 +31,12 @@ enum dsId = -2;
 __gshared ADI v1Adi;
 __gshared Device v1Device;
 
-void main(string[] args)
-{
+int main(string[] args) {
 	debug {
 		configureLoggingProvider(new shared DefaultProvider(true, Levels.DEBUG));
 	} else {
 		configureLoggingProvider(new shared DefaultProvider(true, Levels.INFO));
 	}
-
 
 	Logger log = getLogger();
 	log.info(brandingCode);
@@ -54,7 +53,7 @@ void main(string[] args)
 
 	if (helpInformation.helpWanted) {
 		defaultGetoptPrinter("anisette-server with v3 support", helpInformation.options);
-		return;
+		return 0;
 	}
 
 	if (!file.exists(configurationPath)) {
@@ -127,27 +126,27 @@ void main(string[] args)
 		log.info("Provisioning done!");
 	}
 
-	Server server = new Server();
-	server.host(hostname, port);
-	server.router.add(new AnisetteUnifiedServer());
-	server.run();
-	/+
-	auto server = HttpServer.builder()
-	.setListener(port, hostname)
-	.addRoute("/", (RoutingContext context) {
-	})
-	.addRoute("/v3/client_info", (RoutingContext context) {
-	})
-	.addRoute("/v3/get_headers", (RoutingContext context) {
-	})
-	.websocket("/v3/provisioning_session", new SocketProvisioningSessionHandler()).build();
 
-	server.start();
-+/
+	// Create the router that will map the incoming requests to request handlers
+	auto router = new URLRouter();
+	// Register SampleService as a web service
+	router.registerWebInterface(new AnisetteService());
+
+	// Start up the HTTP server.
+	auto settings = new HTTPServerSettings;
+	settings.port = port;
+	settings.bindAddresses = [hostname];
+	settings.sessionStore = new MemorySessionStore;
+
+	auto listener = listenHTTP(settings, router);
+
+	return runApplication(&args);
 }
 
-class AnisetteUnifiedServer {
-	@Get("") handleV1Request(ServerResponse response) {
+class AnisetteService {
+	@method(HTTPMethod.GET)
+	@path("/")
+	void handleV1Request(HTTPServerRequest req, HTTPServerResponse res) {
 		import std.datetime.systime;
 		import std.datetime.timezone;
 		import core.time;
@@ -173,13 +172,14 @@ class AnisetteUnifiedServer {
 			"X-Mme-Device-Id": v1Device.uniqueDeviceIdentifier,
 		];
 
-		response.contentType = "application/json";
 		response.headers["Implementation-Version"] = brandingCode;
-		response.body = responseJson.toString(JSONOptions.doNotEscapeSlashes);
+		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 		log.infoF!"[>>] 200 OK %s"(responseJson);
 	}
 
-	@Get("v3/client_info") void getClientInfo(ServerResponse response) {
+	@method(HTTPMethod.GET)
+	@path("/v3/client_info")
+	void getClientInfo(HTTPServerRequest req, HTTPServerResponse res) {
 		auto log = getLogger();
 		log.info("[<<] anisette-v3 /v3/client_info");
 		JSONValue responseJson = [
@@ -188,22 +188,30 @@ class AnisetteUnifiedServer {
 		];
 
 		response.headers["Implementation-Version"] = brandingCode;
-		response.body = responseJson.toString(JSONOptions.doNotEscapeSlashes);
+		response.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 	}
 
-	@Post("v3/get_headers") void getHeaders(ServerResponse res, ServerRequest req) {
+	@method(HTTPMethod.POST)
+	@path("/v3/get_headers")
+	void getHeaders(HTTPServerRequest req, HTTPServerResponse res) {
 		auto log = getLogger();
 		log.info("[<<] anisette-v3 /v3/get_headers");
 		string identifier = "(null)";
 		try {
 			import std.uuid;
-			auto json = parseJSON(req.body());
-			ubyte[] identifierBytes = Base64.decode(json["identifier"].str());
-			ubyte[] adi_pb = Base64.decode(json["adi_pb"].str());
+			auto json = req.json();
+			ubyte[] identifierBytes = Base64.decode(json["identifier"].to!string());
+			ubyte[] adi_pb = Base64.decode(json["adi_pb"].to!string());
 			identifier = UUID(identifierBytes[0..16]).toString();
+
 			auto provisioningPath = file.getcwd()
-			.buildPath("provisioning")
-			.buildPath(identifier);
+				.buildPath("provisioning")
+				.buildPath(identifier);
+
+			if (file.exists(provisioningPath)) {
+				file.rmdirRecurse(provisioningPath);
+			}
+
 			file.mkdir(provisioningPath);
 			file.write(provisioningPath.buildPath("adi.pb"), adi_pb);
 			ADI adi = new ADI(libraryPath);
@@ -220,14 +228,16 @@ class AnisetteUnifiedServer {
 				"X-Apple-I-MD-RINFO": "17106176",
 			];
 			res.headers["Implementation-Version"] = brandingCode;
-			res.body = response.toString(JSONOptions.doNotEscapeSlashes);
+			res.writeBody(response.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+			log.info("[>>] anisette-v3 /v3/get_headers OK.");
 		} catch (Throwable t) {
 			JSONValue error = [
 				"result": "GetHeadersError",
 				"message": typeid(t).name ~ ": " ~ t.msg
 			];
 			res.headers["Implementation-Version"] = brandingCode;
-			res.body = error.toString(JSONOptions.doNotEscapeSlashes);
+			log.info("[>>] anisette-v3 /v3/get_headers error.");
+			res.writeBody(error.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 		} finally {
 			if (file.exists(
 				file.getcwd()
@@ -243,111 +253,130 @@ class AnisetteUnifiedServer {
 		}
 	}
 
-	@Get("v3/provisioning_session") class ProvisioningSocket : WebSocket {
-		SocketProvisioningSessionState state;
-		ADI adi;
-		uint session;
+	enum timeout = dur!"msecs"(1250);
 
-		string ip;
+	@method(HTTPMethod.GET)
+	@path("/v3/provisioning_session")
+	void provisionSession(scope WebSocket socket) {
+		auto log = getLogger();
+		log.info("[<<] anisette-v3 /v3/provisionSession connected.");
 
-		void onConnect(ServerRequest request) {
-			getLogger().info("[<<] anisette-v3 /v3/provisioning_session open");
-			state = SocketProvisioningSessionState.waitingForIdentifier;
-			adi = null;
-			session = 0;
-			ip = "";
-
+		try {
 			JSONValue giveIdentifier = [
 				"result": "GiveIdentifier"
 			];
-			send(giveIdentifier.toString(JSONOptions.doNotEscapeSlashes));
-		}
+			socket.send(giveIdentifier.toString(JSONOptions.doNotEscapeSlashes));
 
-		override void onClose() {
-			getLogger().infoF!("[<< %s] anisette-v3 /v3/provisioning_session close")(ip);
-		}
-
-		override void onReceive(ubyte[] data) {
-			string text = cast(string) data;
-			auto log = getLogger();
-			try {
-				final switch (state) with (SocketProvisioningSessionState) {
-					case waitingForIdentifier:
-						auto res = parseJSON(text);
-						ubyte[] requestedIdentifier = Base64.decode(res["identifier"].str());
-
-						if (requestedIdentifier.length != 16) {
-							JSONValue response = [
-								"result": "InvalidIdentifier"
-							];
-
-							log.infoF!("[>> %s] It is invalid.")(ip);
-							send(response.toString());
-							return;
-						}
-						string identifier = UUID(requestedIdentifier[0..16]).toString();
-						log.infoF!("[<< %s] Received an identifier (%s).")(ip, identifier);
-
-						adi = new ADI(libraryPath);
-						adi.provisioningPath = file.getcwd().buildPath("provisioning").buildPath(identifier);
-						adi.identifier = identifier.toUpper()[0..16];
-						state = waitingForStartProvisioningData;
-						JSONValue response = [
-							"result": "GiveStartProvisioningData"
-						];
-						log.infoF!("[>> %s] Okay gimme spim.")(ip);
-						send(response.toString(JSONOptions.doNotEscapeSlashes));
-						break;
-					case waitingForStartProvisioningData:
-						auto res = parseJSON(text);
-						string spim = res["spim"].str();
-						log.infoF!("[<< %s] Received SPIM.")(ip);
-						auto cpimAndCo = adi.startProvisioning(-2, Base64.decode(spim));
-						session = cpimAndCo.session;
-						state = waitingForEndProvisioning;
-						JSONValue response = [
-							"result": "GiveEndProvisioningData",
-							"cpim": Base64.encode(cpimAndCo.clientProvisioningIntermediateMetadata)
-						];
-						log.infoF!("[>> %s] Okay gimme ptm tk.")(ip);
-						send(response.toString(JSONOptions.doNotEscapeSlashes));
-						break;
-					case waitingForEndProvisioning:
-						auto res = parseJSON(text);
-						string ptm = res["ptm"].str();
-						string tk = res["tk"].str();
-						log.infoF!("[<< %s] Received PTM and TK.")(ip);
-						adi.endProvisioning(session, Base64.decode(ptm), Base64.decode(tk));
-						JSONValue response = [
-							"result": "ProvisioningSuccess",
-							"adi_pb": Base64.encode(
-								cast(ubyte[]) file.read(
-									adi.provisioningPath()
-									.buildPath("adi.pb")
-								)
-							)
-						];
-						log.infoF!("[>> %s] Okay all right here is your provisioning data.")(ip);
-						send(response.toString(JSONOptions.doNotEscapeSlashes));
-						break;
-					// +/
-				}
-			} catch (Throwable t) {
-				JSONValue error = [
-					"result": "NonStandard-" ~ typeid(t).name,
-					"message": t.msg
+			log.info("[>>] Asking for identifier.");
+			if (!socket.waitForData(timeout)) {
+				JSONValue timeoutJs = [
+					"result": "Timeout"
 				];
-				log.errorF!"[>>] anisette-v3 error: %s"(t);
-				// connection.sendText(error.toString()).then((_) {
-				// 	connection.close();
-				// });
+				log.info("[>>] Timeout!");
+				socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
+				socket.close();
+				return;
 			}
+
+			auto res = parseJSON(socket.receiveText());
+			ubyte[] requestedIdentifier = Base64.decode(res["identifier"].str());
+			log.info("[>>] Got it.");
+
+			if (requestedIdentifier.length != 16) {
+				JSONValue response = [
+					"result": "InvalidIdentifier"
+				];
+
+				log.info("[>>] It is invalid.");
+				socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+				socket.close();
+				return;
+			}
+
+			string identifier = UUID(requestedIdentifier[0..16]).toString();
+			log.infoF!("[<<] Correct identifier (%s).")(identifier);
+
+			ADI adi = new ADI(libraryPath);
+			auto provisioningPath = file.getcwd()
+				.buildPath("provisioning")
+				.buildPath(identifier);
+			adi.provisioningPath = provisioningPath;
+			scope(exit) {
+				if (file.exists(provisioningPath)) {
+					file.rmdirRecurse(provisioningPath);
+				}
+			}
+			adi.identifier = identifier.toUpper()[0..16];
+
+			JSONValue response = [
+				"result": "GiveStartProvisioningData"
+			];
+			log.info("[>>] Okay asking for spim now.");
+
+			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+
+			if (!socket.waitForData(timeout)) {
+				JSONValue timeoutJs = [
+					"result": "Timeout"
+				];
+				log.info("[>>] Timeout!");
+				socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
+				socket.close();
+				return;
+			}
+			res = parseJSON(socket.receiveText());
+
+			string spim = res["spim"].str();
+			log.info("[<<] Received SPIM.");
+			auto cpimAndCo = adi.startProvisioning(-2, Base64.decode(spim));
+			auto session = cpimAndCo.session;
+
+			response = [
+				"result": "GiveEndProvisioningData",
+				"cpim": Base64.encode(cpimAndCo.clientProvisioningIntermediateMetadata)
+			];
+			log.info("[>>] Okay gimme ptm tk.");
+
+			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+
+			if (!socket.waitForData(timeout)) {
+				JSONValue timeoutJs = [
+					"result": "Timeout"
+				];
+				log.info("[>>] Timeout!");
+				socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
+				socket.close();
+				return;
+			}
+
+			res = parseJSON(socket.receiveText());
+			string ptm = res["ptm"].str();
+			string tk = res["tk"].str();
+			log.info("[<<] Received PTM and TK.");
+
+			adi.endProvisioning(session, Base64.decode(ptm), Base64.decode(tk));
+
+			response = [
+				"result": "ProvisioningSuccess",
+				"adi_pb": Base64.encode(
+					cast(ubyte[]) file.read(
+						adi.provisioningPath()
+						.buildPath("adi.pb")
+					)
+				)
+			];
+			log.info("[>>] Okay all right here is your provisioning data.");
+
+			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+		} catch (Throwable t) {
+			JSONValue error = [
+				"result": "NonStandard-" ~ typeid(t).name,
+				"message": t.msg
+			];
+			log.errorF!"[>>] anisette-v3 error: %s"(t);
+			socket.send(error.toString());
+		} finally {
+			socket.close();
 		}
 	}
-}
-
-enum SocketProvisioningSessionState {
-	waitingForIdentifier,
-	waitingForStartProvisioningData,
-	waitingForEndProvisioning,
 }

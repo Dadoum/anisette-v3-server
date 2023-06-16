@@ -6,11 +6,11 @@
 	],
 
 	"dependencies": {
-		"lighttp": "~>0.5.4",
 		"provision": {
 			"repository": "git+https://github.com/Dadoum/Provision.git",
 			"version": "e302d138ce949e361b2ed939be82efe8bb15aab1"
 		},
-		"slf4d": "~>2.1.1"
+		"slf4d": "~>2.1.1",
+		"vibe-d": "~>0.9.7-alpha.2"
 	}
 }

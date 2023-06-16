@@ -1,7 +1,9 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"diet-ng": "1.8.1",
 		"dxml": "0.4.3",
+		"eventcore": "0.9.25",
 		"hunt": "1.7.17",
 		"hunt-extra": "1.2.3",
 		"hunt-http": "0.8.2",
@@ -10,11 +12,18 @@
 		"libasync": "0.9.2",
 		"lighttp": "0.5.4",
 		"memutils": "1.0.9",
+		"mir-linux-kernel": "1.0.1",
+		"openssl": "3.3.0",
+		"openssl-static": "1.0.2+3.0.8",
 		"plist": "~master",
 		"plist-d": {"version":"d494cf3fe79a2bb20583173c0c8cf85ef33b719e","repository":"git+https://github.com/Dadoum/libplist-d.git"},
 		"provision": {"version":"e302d138ce949e361b2ed939be82efe8bb15aab1","repository":"git+https://github.com/Dadoum/Provision.git"},
 		"slf4d": "2.1.1",
+		"stdx-allocator": "2.77.5",
+		"taggedalgebraic": "0.11.22",
 		"urld": "2.1.1",
+		"vibe-core": "2.2.0",
+		"vibe-d": "0.9.7-alpha.2",
 		"xbuffer": "1.0.0"
 	}
 }
