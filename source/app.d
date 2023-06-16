@@ -104,7 +104,7 @@ int main(string[] args) {
 
 	// Initializing ADI and machine if it has not already been made.
 	v1Device = new Device(configurationPath.buildPath("device.json"));
-	v1Adi = makeGarbageCollectedADI(libraryPath);
+	v1Adi = new ADI(libraryPath);
 	v1Adi.provisioningPath = configurationPath;
 
 	if (!v1Device.initialized) {
@@ -217,6 +217,10 @@ class AnisetteService {
 
 			file.mkdir(provisioningPath);
 			file.write(provisioningPath.buildPath("adi.pb"), adi_pb);
+
+			GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
+			scope(exit) GC.enable();
+
 			ADI adi = makeGarbageCollectedADI(libraryPath);
 			adi.provisioningPath = provisioningPath;
 			adi.identifier = identifier.toUpper()[0..16];
@@ -300,6 +304,8 @@ class AnisetteService {
 			string identifier = UUID(requestedIdentifier[0..16]).toString();
 			log.infoF!("[<<] Correct identifier (%s).")(identifier);
 
+			GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
+			scope(exit) GC.enable();
 			ADI adi = makeGarbageCollectedADI(libraryPath);
 			auto provisioningPath = file.getcwd()
 				.buildPath("provisioning")
