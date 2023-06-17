@@ -11,7 +11,8 @@
 			"version": "b131c625da882700cdda46fcc5172b79eed25f43"
 		},
 		"slf4d": "~>2.1.1",
-		"vibe-d": "~>0.9.7-alpha.2"
+		"vibe-d:web": "~>0.9.7-alpha.2",
+		"vibe-d:http": "~>0.9.7-alpha.2"
 	},
 
 	"configurations": [

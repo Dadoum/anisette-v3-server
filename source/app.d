@@ -1,3 +1,4 @@
+import core.time;
 import core.memory;
 
 import std.algorithm.searching;
@@ -16,7 +17,11 @@ import std.uni;
 import std.uuid;
 import std.zip;
 
-import vibe.d;
+import vibe.core.core;
+import vibe.http.websockets;
+import vibe.http.server;
+import vibe.http.router;
+import vibe.web.web;
 
 import slf4d;
 import slf4d: Logger;
@@ -175,7 +180,7 @@ class AnisetteService {
 			"X-Mme-Device-Id": v1Device.uniqueDeviceIdentifier,
 		];
 
-		response.headers["Implementation-Version"] = brandingCode;
+		res.headers["Implementation-Version"] = brandingCode;
 		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 		log.infoF!"[>>] 200 OK %s"(responseJson);
 	}
@@ -190,8 +195,8 @@ class AnisetteService {
 			"user_agent": "akd/1.0 CFNetwork/808.1.4"
 		];
 
-		response.headers["Implementation-Version"] = brandingCode;
-		response.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+		res.headers["Implementation-Version"] = brandingCode;
+		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 	}
 
 	@method(HTTPMethod.POST)
