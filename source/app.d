@@ -1,3 +1,4 @@
+import core.time;
 import core.memory;
 
 import std.algorithm.searching;
@@ -16,7 +17,11 @@ import std.uni;
 import std.uuid;
 import std.zip;
 
-import vibe.d;
+import vibe.core.core;
+import vibe.http.websockets;
+import vibe.http.server;
+import vibe.http.router;
+import vibe.web.web;
 
 import slf4d;
 import slf4d: Logger;
@@ -175,7 +180,7 @@ class AnisetteService {
 			"X-Mme-Device-Id": v1Device.uniqueDeviceIdentifier,
 		];
 
-		response.headers["Implementation-Version"] = brandingCode;
+		res.headers["Implementation-Version"] = brandingCode;
 		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 		log.infoF!"[>>] 200 OK %s"(responseJson);
 	}
@@ -190,8 +195,8 @@ class AnisetteService {
 			"user_agent": "akd/1.0 CFNetwork/808.1.4"
 		];
 
-		response.headers["Implementation-Version"] = brandingCode;
-		response.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+		res.headers["Implementation-Version"] = brandingCode;
+		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 	}
 
 	@method(HTTPMethod.POST)
@@ -267,102 +272,118 @@ class AnisetteService {
 	@path("/v3/provisioning_session")
 	void provisionSession(scope WebSocket socket) {
 		auto log = getLogger();
-		log.info("[<<] anisette-v3 /v3/provisionSession connected.");
+		scope(exit) socket.close();
 
-		try {
-			JSONValue giveIdentifier = [
-				"result": "GiveIdentifier"
+		auto requestUUID = randomUUID().toString(); // Assign a random UUID to the request to make it easier to track.
+		log.infoF!"[<< %s] anisette-v3 /v3/provisionSession connected."(requestUUID);
+
+		JSONValue giveIdentifier = [
+			"result": "GiveIdentifier"
+		];
+		socket.send(giveIdentifier.toString(JSONOptions.doNotEscapeSlashes));
+
+		log.infoF!"[>> %s] Asking for identifier."(requestUUID);
+		if (!socket.waitForData(timeout)) {
+			JSONValue timeoutJs = [
+				"result": "Timeout"
 			];
-			socket.send(giveIdentifier.toString(JSONOptions.doNotEscapeSlashes));
+			log.infoF!"[>> %s] Timeout!"(requestUUID);
+			socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
+			socket.close();
+			return;
+		}
 
-			log.info("[>>] Asking for identifier.");
-			if (!socket.waitForData(timeout)) {
-				JSONValue timeoutJs = [
-					"result": "Timeout"
-				];
-				log.info("[>>] Timeout!");
-				socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
-				socket.close();
-				return;
-			}
+		auto res = parseJSON(socket.receiveText());
+		ubyte[] requestedIdentifier = Base64.decode(res["identifier"].str());
+		log.infoF!"[>> %s] Got it."(requestUUID);
 
-			auto res = parseJSON(socket.receiveText());
-			ubyte[] requestedIdentifier = Base64.decode(res["identifier"].str());
-			log.info("[>>] Got it.");
-
-			if (requestedIdentifier.length != 16) {
-				JSONValue response = [
-					"result": "InvalidIdentifier"
-				];
-
-				log.info("[>>] It is invalid.");
-				socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
-				socket.close();
-				return;
-			}
-
-			string identifier = UUID(requestedIdentifier[0..16]).toString();
-			log.infoF!("[<<] Correct identifier (%s).")(identifier);
-
-			GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
-			scope(exit) GC.enable();
-			ADI adi = makeGarbageCollectedADI(libraryPath);
-			auto provisioningPath = file.getcwd()
-				.buildPath("provisioning")
-				.buildPath(identifier);
-			adi.provisioningPath = provisioningPath;
-			scope(exit) {
-				if (file.exists(provisioningPath)) {
-					file.rmdirRecurse(provisioningPath);
-				}
-			}
-			adi.identifier = identifier.toUpper()[0..16];
-
+		if (requestedIdentifier.length != 16) {
 			JSONValue response = [
-				"result": "GiveStartProvisioningData"
+				"result": "InvalidIdentifier"
 			];
-			log.info("[>>] Okay asking for spim now.");
 
+			log.infoF!"[>> %s] It is invalid."(requestUUID);
 			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+			socket.close();
+			return;
+		}
 
-			if (!socket.waitForData(timeout)) {
-				JSONValue timeoutJs = [
-					"result": "Timeout"
-				];
-				log.info("[>>] Timeout!");
-				socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
-				socket.close();
-				return;
+		string identifier = UUID(requestedIdentifier[0..16]).toString();
+		log.infoF!("[<< %s] Correct identifier (%s).")(requestUUID, identifier);
+
+		GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
+		scope(exit) GC.enable();
+		ADI adi = makeGarbageCollectedADI(libraryPath);
+		auto provisioningPath = file.getcwd()
+			.buildPath("provisioning")
+			.buildPath(identifier);
+		adi.provisioningPath = provisioningPath;
+		scope(exit) {
+			if (file.exists(provisioningPath)) {
+				file.rmdirRecurse(provisioningPath);
 			}
+		}
+		adi.identifier = identifier.toUpper()[0..16];
+
+		JSONValue response = [
+			"result": "GiveStartProvisioningData"
+		];
+		log.infoF!"[>> %s] Okay asking for spim now."(requestUUID);
+
+		socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+
+		if (!socket.waitForData(timeout)) {
+			JSONValue timeoutJs = [
+				"result": "Timeout"
+			];
+			log.infoF!"[>> %s] Timeout!"(requestUUID);
+			socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
+			socket.close();
+			return;
+		}
+
+		uint session;
+		try {
 			res = parseJSON(socket.receiveText());
 
 			string spim = res["spim"].str();
-			log.info("[<<] Received SPIM.");
+			log.infoF!"[<< %s] Received SPIM."(requestUUID);
 			auto cpimAndCo = adi.startProvisioning(-2, Base64.decode(spim));
-			auto session = cpimAndCo.session;
+			session = cpimAndCo.session;
 
 			response = [
 				"result": "GiveEndProvisioningData",
 				"cpim": Base64.encode(cpimAndCo.clientProvisioningIntermediateMetadata)
 			];
-			log.info("[>>] Okay gimme ptm tk.");
+			log.infoF!"[>> %s] Okay gimme ptm tk."(requestUUID);
 
 			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
+		} catch (Exception ex) {
+			JSONValue error = [
+				"result": "StartProvisioningError",
+				"message": format!"%s (request id: %s)"(ex.msg, requestUUID)
+			];
+			log.errorF!"[>> %s] anisette-v3 error: %s"(requestUUID, ex);
+			socket.send(error.toString());
+			return;
+		}
 
-			if (!socket.waitForData(timeout)) {
-				JSONValue timeoutJs = [
-					"result": "Timeout"
-				];
-				log.info("[>>] Timeout!");
-				socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
-				socket.close();
-				return;
-			}
 
+		if (!socket.waitForData(timeout)) {
+			JSONValue timeoutJs = [
+				"result": "Timeout"
+			];
+			log.infoF!"[>> %s] Timeout!"(requestUUID);
+			socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
+			socket.close();
+			return;
+		}
+
+		try {
 			res = parseJSON(socket.receiveText());
 			string ptm = res["ptm"].str();
 			string tk = res["tk"].str();
-			log.info("[<<] Received PTM and TK.");
+			log.infoF!"[<< %s] Received PTM and TK."(requestUUID);
 
 			adi.endProvisioning(session, Base64.decode(ptm), Base64.decode(tk));
 
@@ -375,19 +396,18 @@ class AnisetteService {
 					)
 				)
 			];
-			log.info("[>>] Okay all right here is your provisioning data.");
-
-			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
-		} catch (Throwable t) {
+		} catch (Exception ex) {
 			JSONValue error = [
-				"result": "NonStandard-" ~ typeid(t).name,
-				"message": t.msg
+				"result": "EndProvisioningError",
+				"message": format!"%s (request id: %s)"(ex.msg, requestUUID)
 			];
-			log.errorF!"[>>] anisette-v3 error: %s"(t);
+			log.errorF!"[>> %s] anisette-v3 error: %s"(requestUUID, ex);
 			socket.send(error.toString());
-		} finally {
-			socket.close();
+			return;
 		}
+
+		log.infoF!"[>> %s] Okay all right here is your provisioning data."(requestUUID);
+		socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
 	}
 }
 
