@@ -21,6 +21,7 @@ import vibe.core.core;
 import vibe.http.websockets;
 import vibe.http.server;
 import vibe.http.router;
+import vibe.stream.tls;
 import vibe.web.web;
 
 import slf4d;
@@ -52,12 +53,23 @@ int main(string[] args) {
 	ushort port = 6969;
 
 	string configurationPath = expandTilde("~/.config/anisette-v3");
+
+	string certificateChainPath = null;
+	string privateKeyPath = null;
+
 	auto helpInformation = getopt(
 		args,
 		"n|host", format!"The hostname to bind to (default: %s)"(hostname), &hostname,
 		"p|port", format!"The port to bind to (default: %s)"(port), &port,
 		"a|adi-path", format!"Where the provisioning information should be stored on the computer for anisette-v1 backwards compat (default: %s)"(configurationPath), &configurationPath,
+		"private-key", "Path to the PEM-formatted private key file for HTTPS support (requires --cert-chain)", &certificateChainPath,
+		"cert-chain", "Path to the PEM-formatted certificate chain file for HTTPS support (requires --private-key)", &privateKeyPath,
 	);
+
+	if ((certificateChainPath && !privateKeyPath) || (!certificateChainPath && privateKeyPath)) {
+		log.error("--certificate-chain and --private-key must both be specified for HTTPS support (they can be both be in the same file though).");
+		return 1;
+	}
 
 	if (helpInformation.helpWanted) {
 		defaultGetoptPrinter("anisette-server with v3 support", helpInformation.options);
@@ -145,6 +157,11 @@ int main(string[] args) {
 	settings.port = port;
 	settings.bindAddresses = [hostname];
 	settings.sessionStore = new MemorySessionStore;
+	if (certificateChainPath) {
+		settings.tlsContext = createTLSContext(TLSContextKind.server);
+		settings.tlsContext.useCertificateChainFile(certificateChainPath);
+		settings.tlsContext.usePrivateKeyFile(privateKeyPath);
+	}
 
 	auto listener = listenHTTP(settings, router);
 
