@@ -1,5 +1,5 @@
 # Base for builder
-FROM debian:unstable-slim AS builder
+FROM debian:bookworm-slim AS builder
 # Deps for builder
 RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates ldc git clang dub libz-dev libssl-dev \
  && apt-get clean \
@@ -11,7 +11,7 @@ COPY . .
 RUN DC=ldc2 dub build -c "static" --build-mode allAtOnce -b release --compiler=ldc2
 
 # Base for run
-FROM debian:unstable-slim
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates curl \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
