@@ -293,22 +293,24 @@ class AnisetteService {
 			return;
 		}
 
-		auto res = parseJSON(socket.receiveText());
-		ubyte[] requestedIdentifier = Base64.decode(res["identifier"].str());
-		log.infoF!"[>> %s] Got it."(requestUUID);
+		string identifier;
+		try {
+			auto res = parseJSON(socket.receiveText());
+			ubyte[] requestedIdentifier = Base64.decode(res["identifier"].str());
+			log.infoF!"[>> %s] Got it."(requestUUID);
 
-		if (requestedIdentifier.length != 16) {
+			identifier = UUID(requestedIdentifier[0..16]).toString();
+		} catch (Exception ex) {
 			JSONValue response = [
 				"result": "InvalidIdentifier"
 			];
 
-			log.infoF!"[>> %s] It is invalid."(requestUUID);
+			log.infoF!"[>> %s] It is invalid: %s"(requestUUID, ex);
 			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
 			socket.close();
 			return;
 		}
 
-		string identifier = UUID(requestedIdentifier[0..16]).toString();
 		log.infoF!("[<< %s] Correct identifier (%s).")(requestUUID, identifier);
 
 		GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
@@ -344,7 +346,7 @@ class AnisetteService {
 
 		uint session;
 		try {
-			res = parseJSON(socket.receiveText());
+			auto res = parseJSON(socket.receiveText());
 
 			string spim = res["spim"].str();
 			log.infoF!"[<< %s] Received SPIM."(requestUUID);
@@ -380,7 +382,7 @@ class AnisetteService {
 		}
 
 		try {
-			res = parseJSON(socket.receiveText());
+			auto res = parseJSON(socket.receiveText());
 			string ptm = res["ptm"].str();
 			string tk = res["tk"].str();
 			log.infoF!"[<< %s] Received PTM and TK."(requestUUID);
