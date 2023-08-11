@@ -241,7 +241,10 @@ class AnisetteService {
 			file.write(provisioningPath.buildPath("adi.pb"), adi_pb);
 
 			GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
-			scope(exit) GC.enable();
+			scope(exit) {
+				GC.enable();
+				GC.collect();
+			}
 
 			ADI adi = makeGarbageCollectedADI(libraryPath);
 			adi.provisioningPath = provisioningPath;
@@ -330,7 +333,10 @@ class AnisetteService {
 		log.infoF!("[<< %s] Correct identifier (%s).")(requestUUID, identifier);
 
 		GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
-		scope(exit) GC.enable();
+		scope(exit) {
+			GC.enable();
+			GC.collect();
+		}
 		ADI adi = makeGarbageCollectedADI(libraryPath);
 		auto provisioningPath = file.getcwd()
 			.buildPath("provisioning")

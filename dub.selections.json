@@ -1,6 +1,8 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"automem": "0.6.9",
+		"cachetools": "0.4.1",
 		"diet-ng": "1.8.1",
 		"dxml": "0.4.3",
 		"eventcore": "0.9.25",
@@ -11,10 +13,13 @@
 		"openssl-static": "1.0.2+3.0.8",
 		"plist": "~master",
 		"plist-d": {"version":"d494cf3fe79a2bb20583173c0c8cf85ef33b719e","repository":"git+https://github.com/Dadoum/libplist-d.git"},
-		"provision": {"version":"58f339fe988d770da5de4ad7361a619b5deea2f6","repository":"git+https://github.com/Dadoum/Provision.git"},
+		"provision": {"version":"fa028b6f4e6e2704bf43f92031fe5c3223045f64","repository":"git+https://github.com/Dadoum/Provision.git"},
+		"requests": "2.1.1",
 		"slf4d": "2.1.1",
 		"stdx-allocator": "2.77.5",
 		"taggedalgebraic": "0.11.22",
+		"test_allocator": "0.3.4",
+		"unit-threaded": "0.10.8",
 		"vibe-core": "2.2.0",
 		"vibe-d": "0.9.7-alpha.2"
 	}
