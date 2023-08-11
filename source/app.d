@@ -279,7 +279,6 @@ class AnisetteService {
 					.buildPath(identifier)
 				);
 			}
-			GC.collect();
 		}
 	}
 
