@@ -11,7 +11,7 @@
 		"openssl-static": "1.0.2+3.0.8",
 		"plist": "~master",
 		"plist-d": {"version":"d494cf3fe79a2bb20583173c0c8cf85ef33b719e","repository":"git+https://github.com/Dadoum/libplist-d.git"},
-		"provision": {"version":"b131c625da882700cdda46fcc5172b79eed25f43","repository":"git+https://github.com/Dadoum/Provision.git"},
+		"provision": {"version":"58f339fe988d770da5de4ad7361a619b5deea2f6","repository":"git+https://github.com/Dadoum/Provision.git"},
 		"slf4d": "2.1.1",
 		"stdx-allocator": "2.77.5",
 		"taggedalgebraic": "0.11.22",
