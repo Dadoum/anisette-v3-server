@@ -437,7 +437,7 @@ class AnisetteService {
 
 private ADI makeGarbageCollectedADI(string libraryPath) {
 	extern(C) void* malloc_GC(size_t sz) {
-		return GC.malloc(sz);
+		return GC.malloc(sz, GC.BlkAttr.NO_MOVE);
 	}
 
 	extern(C) void free_GC(void* ptr) {
