@@ -253,7 +253,7 @@ class AnisetteService {
 				GC.collect();
 			}
 
-			ADI adi = makeGarbageCollectedADI(libraryPath);
+			scope ADI adi = makeGarbageCollectedADI(libraryPath);
 			adi.provisioningPath = provisioningPath;
 			adi.identifier = identifier.toUpper()[0..16];
 
@@ -313,7 +313,6 @@ class AnisetteService {
 			];
 			log.infoF!"[>> %s] Timeout!"(requestUUID);
 			socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
-			socket.close();
 			return;
 		}
 
@@ -331,7 +330,6 @@ class AnisetteService {
 
 			log.infoF!"[>> %s] It is invalid: %s"(requestUUID, ex);
 			socket.send(response.toString(JSONOptions.doNotEscapeSlashes));
-			socket.close();
 			return;
 		}
 
@@ -342,7 +340,7 @@ class AnisetteService {
 			GC.enable();
 			GC.collect();
 		}
-		ADI adi = makeGarbageCollectedADI(libraryPath);
+		scope ADI adi = makeGarbageCollectedADI(libraryPath);
 		auto provisioningPath = file.getcwd()
 			.buildPath("provisioning")
 			.buildPath(identifier);
@@ -367,7 +365,6 @@ class AnisetteService {
 			];
 			log.infoF!"[>> %s] Timeout!"(requestUUID);
 			socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
-			socket.close();
 			return;
 		}
 
@@ -379,6 +376,7 @@ class AnisetteService {
 			log.infoF!"[<< %s] Received SPIM."(requestUUID);
 			auto cpimAndCo = adi.startProvisioning(-2, Base64.decode(spim));
 			session = cpimAndCo.session;
+			scope(failure) adi.destroyProvisioning(session);
 
 			response = [
 				"result": "GiveEndProvisioningData",
@@ -404,7 +402,6 @@ class AnisetteService {
 			];
 			log.infoF!"[>> %s] Timeout!"(requestUUID);
 			socket.send(timeoutJs.toString(JSONOptions.doNotEscapeSlashes));
-			socket.close();
 			return;
 		}
 
@@ -442,7 +439,7 @@ class AnisetteService {
 
 private ADI makeGarbageCollectedADI(string libraryPath) {
 	extern(C) void* malloc_GC(size_t sz) {
-		return GC.malloc(sz, GC.BlkAttr.NO_MOVE);
+		return GC.malloc(sz, GC.BlkAttr.NO_MOVE | GC.BlkAttr.NO_SCAN);
 	}
 
 	extern(C) void free_GC(void* ptr) {
