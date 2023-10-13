@@ -9,7 +9,7 @@
 		"libasync": "0.8.6",
 		"memutils": "1.0.9",
 		"mir-linux-kernel": "1.0.1",
-		"openssl": "3.3.0",
+		"openssl": "3.3.3",
 		"openssl-static": "1.0.2+3.0.8",
 		"plist": "~master",
 		"plist-d": {"version":"d494cf3fe79a2bb20583173c0c8cf85ef33b719e","repository":"git+https://github.com/Dadoum/libplist-d.git"},
