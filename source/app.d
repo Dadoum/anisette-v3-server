@@ -61,6 +61,8 @@ int main(string[] args) {
 
 	long timeoutMsecs = 3000;
 
+	bool skipServerStartup = false;
+
 	auto helpInformation = getopt(
 		args,
 		"n|host", format!"The hostname to bind to (default: %s)"(hostname), &hostname,
@@ -69,6 +71,7 @@ int main(string[] args) {
 		"timeout", format!"Timeout duration for Anisette V3 in milliseconds (default: %d)"(timeoutMsecs), &timeoutMsecs,
 		"private-key", "Path to the PEM-formatted private key file for HTTPS support (requires --cert-chain)", &certificateChainPath,
 		"cert-chain", "Path to the PEM-formatted certificate chain file for HTTPS support (requires --private-key)", &privateKeyPath,
+		"skip-server-startup", "If provided the server will skip HTTP binding and instead execute only initial configuration (if needed).", &skipServerStartup,
 	);
 
 	timeout = dur!"msecs"(timeoutMsecs);
@@ -153,6 +156,10 @@ int main(string[] args) {
 		log.info("Provisioning done!");
 	}
 
+	if (skipServerStartup) {
+		log.info("Configuration complete, shutting down.");
+		return 0;
+	}
 
 	// Create the router that will map the incoming requests to request handlers
 	auto router = new URLRouter();
