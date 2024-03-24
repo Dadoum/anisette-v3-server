@@ -19,7 +19,7 @@
         line: "export XDG_RUNTIME_DIR=/run/user/{{rootless_usr.uid}}"
         path: "/home/{{ rootless_usr.name }}/.bashrc"
 
-    - name: Make sure acl is installed for rootless
+    - name: Install podman and deps
       ansible.builtin.package:
         name:
           - podman
