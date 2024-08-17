@@ -8,11 +8,11 @@
 	"dependencies": {
 		"provision": {
 			"repository": "git+https://github.com/Dadoum/Provision.git",
-			"version": "fa028b6f4e6e2704bf43f92031fe5c3223045f64"
+			"version": "fe879b1148767767481b9c2753d4fd741cb2d7fa"
 		},
 		"slf4d": "~>2.1.1",
-		"vibe-d:web": "~>0.9.7-alpha.2",
-		"vibe-d:http": "~>0.9.7-alpha.2"
+		"vibe-d:web": "~>0.9.8",
+		"vibe-d:http": "~>0.9.8"
 	},
 
 	"configurations": [
