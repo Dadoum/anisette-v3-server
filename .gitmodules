@@ -1,0 +1,3 @@
+[submodule "AppleCollector"]
+	path = AppleCollector
+	url = https://github.com/placemate-app/AppleCollector.git
