@@ -420,13 +420,13 @@ class AnisetteService {
 
 			adi.endProvisioning(session, Base64.decode(ptm), Base64.decode(tk));
 
+			auto adiPath = adi.provisioningPath().buildPath("adi.pb");
+			file.setAttributes(adiPath, 384); // 0600 = rw for owner
+
 			response = [
 				"result": "ProvisioningSuccess",
 				"adi_pb": Base64.encode(
-					cast(ubyte[]) file.read(
-						adi.provisioningPath()
-						.buildPath("adi.pb")
-					)
+					cast(ubyte[]) file.read(adiPath)
 				)
 			];
 		} catch (Exception ex) {
