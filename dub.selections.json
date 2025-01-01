@@ -12,7 +12,7 @@
 		"mir-linux-kernel": "1.0.1",
 		"openssl": "3.3.3",
 		"openssl-static": "1.0.5+3.0.8",
-		"plist": "~master",
+		"plist": {"version":"a425458e2c3d8195c6a9ad68e643f2d823850693","repository":"git+https://github.com/Dadoum/plist.git"},
 		"plist-d": {"version":"5020d8e45ca2c77183a44ce04053ccbf8bc83262","repository":"git+https://github.com/Dadoum/libplist-d.git"},
 		"provision": {"version":"fe879b1148767767481b9c2753d4fd741cb2d7fa","repository":"git+https://github.com/Dadoum/Provision.git"},
 		"requests": "2.1.3",
