@@ -12,6 +12,7 @@ import std.json;
 import std.math;
 import std.net.curl;
 import std.parallelism;
+import process = std.process;
 import std.path;
 import std.uni;
 import std.uuid;
@@ -32,6 +33,7 @@ import provision;
 import provision.androidlibrary;
 
 __gshared string libraryPath;
+__gshared string provisioningPath;
 
 enum brandingCode = format!"anisette-v3-server v%s"(provisionVersion);
 enum clientInfo = "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>";
@@ -92,11 +94,10 @@ int main(string[] args) {
 
 	libraryPath = configurationPath.buildPath("lib");
 
-	string provisioningPathV3 = file.getcwd().buildPath("provisioning");
+	string runtimePath = process.environment.get("RUNTIME_DIRECTORY", process.environment.get("XDG_RUNTIME_DIR", file.getcwd()))
+		.buildPath("anisette-v3");
 
-	if (!file.exists(provisioningPathV3)) {
-		file.mkdir(provisioningPathV3);
-	}
+	provisioningPath = runtimePath.buildPath("provisioning");
 
 	auto coreADIPath = libraryPath.buildPath("libCoreADI.so");
 	auto SSCPath = libraryPath.buildPath("libstoreservicescore.so");
@@ -236,23 +237,21 @@ class AnisetteService {
 		auto log = getLogger();
 		log.info("[<<] anisette-v3 /v3/get_headers");
 		string identifier = "(null)";
+		string tmpProvisioningPath;
 		try {
 			import std.uuid;
 			auto json = req.json();
 			ubyte[] identifierBytes = Base64.decode(json["identifier"].to!string());
 			ubyte[] adi_pb = Base64.decode(json["adi_pb"].to!string());
 			identifier = UUID(identifierBytes[0..16]).toString();
+			tmpProvisioningPath = provisioningPath.buildPath(identifier);
 
-			auto provisioningPath = file.getcwd()
-				.buildPath("provisioning")
-				.buildPath(identifier);
-
-			if (file.exists(provisioningPath)) {
-				file.rmdirRecurse(provisioningPath);
+			if (file.exists(tmpProvisioningPath)) {
+				file.rmdirRecurse(tmpProvisioningPath);
 			}
 
-			file.mkdir(provisioningPath);
-			file.write(provisioningPath.buildPath("adi.pb"), adi_pb);
+			file.mkdirRecurse(tmpProvisioningPath);
+			file.write(tmpProvisioningPath.buildPath("adi.pb"), adi_pb);
 
 			GC.disable(); // garbage collector can deallocate ADI parts since it can't find the pointers.
 			scope(exit) {
@@ -261,11 +260,11 @@ class AnisetteService {
 			}
 
 			scope ADI adi = makeGarbageCollectedADI(libraryPath);
-			adi.provisioningPath = provisioningPath;
+			adi.provisioningPath = tmpProvisioningPath;
 			adi.identifier = identifier.toUpper()[0..16];
 
 			auto otp = adi.requestOTP(dsId);
-			file.rmdirRecurse(provisioningPath);
+			file.rmdirRecurse(tmpProvisioningPath);
 
 			JSONValue response = [ // Provision does no longer have a concept of 'request headers'
 				"result": "Headers",
@@ -285,16 +284,8 @@ class AnisetteService {
 			log.info("[>>] anisette-v3 /v3/get_headers error.");
 			res.writeBody(error.toString(JSONOptions.doNotEscapeSlashes), "application/json");
 		} finally {
-			if (file.exists(
-				file.getcwd()
-				.buildPath("provisioning")
-				.buildPath(identifier)
-			)) {
-				file.rmdirRecurse(
-					file.getcwd()
-					.buildPath("provisioning")
-					.buildPath(identifier)
-				);
+			if (file.exists(tmpProvisioningPath)) {
+				file.rmdirRecurse(tmpProvisioningPath);
 			}
 		}
 	}
@@ -348,13 +339,11 @@ class AnisetteService {
 			GC.collect();
 		}
 		scope ADI adi = makeGarbageCollectedADI(libraryPath);
-		auto provisioningPath = file.getcwd()
-			.buildPath("provisioning")
-			.buildPath(identifier);
-		adi.provisioningPath = provisioningPath;
+		auto tmpProvisioningPath = provisioningPath.buildPath(identifier);
+		adi.provisioningPath = tmpProvisioningPath;
 		scope(exit) {
-			if (file.exists(provisioningPath)) {
-				file.rmdirRecurse(provisioningPath);
+			if (file.exists(tmpProvisioningPath)) {
+				file.rmdirRecurse(tmpProvisioningPath);
 			}
 		}
 		adi.identifier = identifier.toUpper()[0..16];
