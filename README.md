@@ -7,9 +7,24 @@ anisette-v3) but it can also be used with AltServer-Linux.
 
 ## Run using Docker
 
-```bash
-docker run -d --restart always --name anisette-v3 -p 6969:6969 --volume anisette-v3_data:/home/Alcoholic/.config/anisette-v3/lib/ dadoum/anisette-v3-server
-```
+1. Create your anisette server data folder
+   ```bash
+   mkdir -p /opt/anisette-v3_data
+   ```
+2. Fix permission
+   ```bash
+   chown -R 1000:1000 /opt/anisette-v3_data
+   chmod -R 775 /opt/anisette-v3_data/
+   ```
+3. Run the container
+   ```bash
+   docker run -d --restart always \
+     --name anisette-v3 \
+     -p 6969:6969 \
+     -v /opt/anisette-v3_data:/home/Alcoholic/.config/anisette-v3/lib/ \
+     -e HOME=/home/Alcoholic \
+     dadoum/anisette-v3-server
+   ```
 
 ## Compile using dub
 
