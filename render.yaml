@@ -1,0 +1,10 @@
+version: "1"
+services:
+- type: web
+  name: anisette-v3-server
+  runtime: image
+  image:
+    url: dadoum/anisette-v3-server
+  plan: free
+  region: ohio
+  autoDeploy: false
