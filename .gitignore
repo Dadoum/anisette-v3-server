@@ -16,3 +16,4 @@ anisette-v3-server-test-*
 *.lst
 /.idea/
 /*.iml
+.DS_Store
