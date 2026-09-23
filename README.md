@@ -20,6 +20,16 @@ DC=ldc2 dub build -c "static" --build-mode allAtOnce -b release --compiler=ldc2
 stat anisette-v3-server
 ```
 
+## Build the Docker image locally
+
+The GitHub Actions workflow publishes `dadoum/anisette-v3-server` for `linux/386`, `linux/amd64`, and `linux/arm64/v8` only. `linux/arm/v7` is not built by Actions because LDC builds under QEMU are unreliable for that target.
+
+If you need an ARMv7 image, build it locally on a native ARMv7 system or other environment that can produce a compatible binary:
+
+```bash
+docker buildx build --platform linux/arm/v7 -t dadoum/anisette-v3-server:armv7 .
+```
+
 ## Ansible
 
 If you want to quickly setup anisette-v3 with ansible, just use the setup-anisette-v3-ansible.yaml playbook.
