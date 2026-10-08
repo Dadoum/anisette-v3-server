@@ -5,6 +5,8 @@ A supposedly lighter alternative to [omnisette-server](https://github.com/SideSt
 Like `omnisette-server`, it supports both currently supported SideStore's protocols (anisette-v1 and 
 anisette-v3) but it can also be used with AltServer-Linux.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Dadoum/anisette-v3-server)
+
 ## Run using Docker
 
 ```bash
