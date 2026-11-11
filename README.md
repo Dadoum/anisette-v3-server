@@ -11,6 +11,31 @@ anisette-v3) but it can also be used with AltServer-Linux.
 docker run -d --restart always --name anisette-v3 -p 6969:6969 --volume anisette-v3_data:/home/Alcoholic/.config/anisette-v3/lib/ dadoum/anisette-v3-server
 ```
 
+## The identity of the server
+
+The ADI libraries this server loads are the ones shipped in the Apple Music
+application for Android, so the server is an Android device as far as Apple is
+concerned. Since October 2026, Apple's GrandSlam compares the platform
+advertised in `X-Mme-Client-Info` with the platform of the ADI library that
+produced the one-time password, and refuses the request with `-80045` ("This
+action cannot be completed at this time.") when the two disagree. The server
+therefore advertises the Android identity by default, and `--client-info` /
+`--user-agent` (or the `ANISETTE_CLIENT_INFO` / `ANISETTE_USER_AGENT`
+environment variables) can be used to declare a different one.
+
+```bash
+docker run -d --name anisette-v3 -p 6969:6969 \
+  --volume anisette-v3_data:/home/Alcoholic/.config/anisette-v3/lib/ \
+  dadoum/anisette-v3-server \
+  --client-info "<PC> <Windows;6.2(0,0);9200> <com.apple.iTunes/12.9.3>"
+```
+
+Keep in mind that Apple routes clients to a different GrandSlam service
+depending on the platform that is advertised, so a client that talks to
+`gsa.apple.com` directly needs to follow the URL bag
+(`https://gsa.apple.com/grandslam/GsService2/lookup`) to find out which
+service to use.
+
 ## Compile using dub
 
 ```bash

@@ -36,8 +36,30 @@ __gshared string libraryPath;
 __gshared string provisioningPath;
 
 enum brandingCode = format!"anisette-v3-server v%s"(provisionVersion);
-enum clientInfo = "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
 enum dsId = -2;
+
+/// The identity this server advertises in `X-Mme-Client-Info` by default.
+///
+/// The ADI libraries this server loads are the ones shipped in the Apple Music
+/// application for Android, so this server *is* an Android device as far as
+/// Apple is concerned.
+///
+/// Since October 2026, Apple's GrandSlam compares the platform advertised in
+/// `X-Mme-Client-Info` with the platform of the ADI library that produced the
+/// one-time password, and refuses the request with -80045 ("This action cannot
+/// be completed at this time.") when the two disagree. Advertising a platform
+/// we are not therefore gets every sign-in refused, so advertise the one we
+/// are. See https://github.com/Dadoum/anisette-v3-server/issues/61
+enum defaultClientInfo = "<Pixel 8><Android; 14; UQ1A.240205.004><com.apple.AuthKit/1 (com.apple.android.music/4.9.6)>";
+
+/// The user agent this server advertises next to its identity by default.
+enum defaultUserAgent = "akd/1.0 CFNetwork/808.1.4";
+
+/// The identity this server advertises in `X-Mme-Client-Info`.
+__gshared string clientInfo;
+
+/// The user agent this server advertises next to its identity.
+__gshared string clientUserAgent;
 
 __gshared ADI v1Adi;
 __gshared Device v1Device;
@@ -65,6 +87,11 @@ int main(string[] args) {
 
 	bool skipServerStartup = false;
 
+	// The identity may also be given through the environment, which is handy
+	// when the server runs from a container.
+	string clientInfoOption = process.environment.get("ANISETTE_CLIENT_INFO", defaultClientInfo);
+	string userAgentOption = process.environment.get("ANISETTE_USER_AGENT", defaultUserAgent);
+
 	auto helpInformation = getopt(
 		args,
 		"n|host", format!"The hostname to bind to (default: %s)"(hostname), &hostname,
@@ -74,9 +101,13 @@ int main(string[] args) {
 		"private-key", "Path to the PEM-formatted private key file for HTTPS support (requires --cert-chain)", &certificateChainPath,
 		"cert-chain", "Path to the PEM-formatted certificate chain file for HTTPS support (requires --private-key)", &privateKeyPath,
 		"skip-server-startup", "If provided the server will skip HTTP binding and instead execute only initial configuration (if needed).", &skipServerStartup,
+		"client-info", format!"The identity to advertise in X-Mme-Client-Info. It must describe the platform of the ADI in use, otherwise Apple refuses sign-ins with -80045 (default: %s)"(defaultClientInfo), &clientInfoOption,
+		"user-agent", format!"The user agent to advertise next to the identity (default: %s)"(defaultUserAgent), &userAgentOption,
 	);
 
 	timeout = dur!"msecs"(timeoutMsecs);
+	clientInfo = clientInfoOption;
+	clientUserAgent = userAgentOption;
 
 	if ((certificateChainPath && !privateKeyPath) || (!certificateChainPath && privateKeyPath)) {
 		log.error("--certificate-chain and --private-key must both be specified for HTTPS support (they can be both be in the same file though).");
@@ -140,12 +171,19 @@ int main(string[] args) {
 
 		import std.random;
 		import std.range;
-		v1Device.serverFriendlyDescription = clientInfo;
 		v1Device.uniqueDeviceIdentifier = randomUUID().toString().toUpper();
 		v1Device.adiIdentifier = (cast(ubyte[]) rndGen.take(2).array()).toHexString().toLower();
 		v1Device.localUserUUID = (cast(ubyte[]) rndGen.take(8).array()).toHexString().toUpper();
+		v1Device.serverFriendlyDescription = clientInfo;
 
 		log.info("Machine creation done!");
+	} else if (v1Device.serverFriendlyDescription != clientInfo) {
+		// The identity is written to the machine description when the machine is
+		// created, so a server whose identity changed would keep describing the
+		// machine with the old one. The description is also what is sent when
+		// provisioning, so it has to be the identity we advertise.
+		log.infoF!"Updating machine identity to '%s'..."(clientInfo);
+		v1Device.serverFriendlyDescription = clientInfo;
 	}
 
 	v1Adi.identifier = v1Device.adiIdentifier;
@@ -232,7 +270,7 @@ class AnisetteService {
 		log.info("[<<] anisette-v3 /v3/client_info");
 		JSONValue responseJson = [
 			"client_info": clientInfo,
-			"user_agent": "akd/1.0 CFNetwork/808.1.4"
+			"user_agent": clientUserAgent
 		];
 
 		res.headers["Implementation-Version"] = brandingCode;
