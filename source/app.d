@@ -71,8 +71,8 @@ int main(string[] args) {
 		"p|port", format!"The port to bind to (default: %s)"(port), &port,
 		"a|adi-path", format!"Where the provisioning information should be stored on the computer for anisette-v1 backwards compat (default: %s)"(configurationPath), &configurationPath,
 		"timeout", format!"Timeout duration for Anisette V3 in milliseconds (default: %d)"(timeoutMsecs), &timeoutMsecs,
-		"private-key", "Path to the PEM-formatted private key file for HTTPS support (requires --cert-chain)", &certificateChainPath,
-		"cert-chain", "Path to the PEM-formatted certificate chain file for HTTPS support (requires --private-key)", &privateKeyPath,
+		"private-key", "Path to the PEM-formatted private key file for HTTPS support (requires --cert-chain)", &privateKeyPath,
+		"cert-chain", "Path to the PEM-formatted certificate chain file for HTTPS support (requires --private-key)", &certificateChainPath,
 		"skip-server-startup", "If provided the server will skip HTTP binding and instead execute only initial configuration (if needed).", &skipServerStartup,
 	);
 
